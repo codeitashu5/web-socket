@@ -82,5 +82,6 @@ func main() {
   -- the player with the largest card wins
   -- there should be an api to through card for each player
   -- in the end the player with most no of points wins
+  -- todo: add communication for multiple users
 
 */

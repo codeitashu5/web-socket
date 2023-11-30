@@ -9,7 +9,7 @@ import (
 
 // creating home page for web socket
 func homePage(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "working fine")
+
 }
 
 var upGrader = websocket.Upgrader{
@@ -26,6 +26,25 @@ type Client struct {
 func newClient(conn *websocket.Conn) *Client {
 	return &Client{
 		conn: conn,
+	}
+}
+
+func (c *Client) reader() {
+	for {
+		// read message from the client
+		messageType, p, err := c.conn.ReadMessage()
+		if err != nil {
+			log.Println(err)
+		}
+
+		// print the message that is read
+		fmt.Println(string(p))
+
+		// send conformation message back to the client
+		err = c.conn.WriteMessage(messageType, []byte("Message is been read"))
+		if err != nil {
+			log.Println(err)
+		}
 	}
 }
 
@@ -51,27 +70,7 @@ func wsEndPoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// so using this we are reading messages form this client --> the messages that are being send on this socket form the front end
-	reader(client.conn)
-}
-
-// this takes a web-socket connection and continuously reads from it until the connection is broken
-func reader(conn *websocket.Conn) {
-	for {
-		// read message from the client
-		messageType, p, err := conn.ReadMessage()
-		if err != nil {
-			log.Println(err)
-		}
-
-		// print the message that is read
-		fmt.Println(string(p))
-
-		// send conformation message back to the client
-		err = conn.WriteMessage(messageType, []byte("Message is been read"))
-		if err != nil {
-			log.Println(err)
-		}
-	}
+	client.reader()
 }
 
 func setUpRoutes() {

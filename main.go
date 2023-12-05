@@ -5,50 +5,15 @@ import (
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
+	"web-socket/wsServer"
 )
-
-// creating home page for web socket
-func homePage(w http.ResponseWriter, r *http.Request) {
-
-}
 
 var upGrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 }
 
-// Client each client has a connection associated with it
-type Client struct {
-	conn *websocket.Conn
-}
-
-// each client is created with a connection
-func newClient(conn *websocket.Conn) *Client {
-	return &Client{
-		conn: conn,
-	}
-}
-
-func (c *Client) reader() {
-	for {
-		// read message from the client
-		messageType, p, err := c.conn.ReadMessage()
-		if err != nil {
-			log.Println(err)
-		}
-
-		// print the message that is read
-		fmt.Println(string(p))
-
-		// send conformation message back to the client
-		err = c.conn.WriteMessage(messageType, []byte("Message is been read"))
-		if err != nil {
-			log.Println(err)
-		}
-	}
-}
-
-func wsEndPoint(w http.ResponseWriter, r *http.Request) {
+func wsEndPoint(ws *wsServer.WsServer, w http.ResponseWriter, r *http.Request) {
 	// it is used to validate the domain but as of now we will allow any host that wants to connect
 	upGrader.CheckOrigin = func(r *http.Request) bool { return true }
 
@@ -61,25 +26,35 @@ func wsEndPoint(w http.ResponseWriter, r *http.Request) {
 	// we have created a connection for the client using which the client can communicate
 	log.Println("Client Connected")
 
-	// associate your connection with the client
-	client := newClient(conn)
+	// now the client is being associated with a server and a connection
+	client := wsServer.NewClient(ws, conn)
 
-	err = client.conn.WriteMessage(1, []byte("Hi Client!"))
+	// register client on server
+	ws.Register <- client.Client
+
+	err = client.Client.Conn.WriteMessage(1, []byte("Hi Client!"))
 	if err != nil {
 		log.Println(err)
 	}
 
 	// so using this we are reading messages form this client --> the messages that are being send on this socket form the front end
-	client.reader()
+	client.Reader()
 }
 
 func setUpRoutes() {
-	http.HandleFunc("/health", homePage)
-	http.HandleFunc("/ws", wsEndPoint)
+	wsLocalServer := wsServer.NewWebSocketServer()
+	// this function will run parallel without stoping the further execution
+	go wsLocalServer.Run()
+
+	// associate the server with the request
+	http.HandleFunc("/ws", func(writer http.ResponseWriter, request *http.Request) {
+		wsEndPoint(wsLocalServer, writer, request)
+	})
 }
 
 func main() {
 	fmt.Println("hello world")
+
 	setUpRoutes()
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

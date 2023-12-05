@@ -5,17 +5,17 @@ import (
 )
 
 type WsServer struct {
-	clients    map[*models.Client]bool
-	register   chan *models.Client
-	unRegister chan *models.Client
+	Clients    map[*models.Client]bool
+	Register   chan *models.Client
+	UnRegister chan *models.Client
 }
 
 // NewWebSocketServer to crate a new webSocket server
 func NewWebSocketServer() *WsServer {
 	return &WsServer{
-		clients:    make(map[*models.Client]bool),
-		register:   make(chan *models.Client),
-		unRegister: make(chan *models.Client),
+		Clients:    make(map[*models.Client]bool),
+		Register:   make(chan *models.Client),
+		UnRegister: make(chan *models.Client),
 	}
 }
 
@@ -25,20 +25,20 @@ func (wsServer *WsServer) Run() {
 		// used to wait on chanel operation
 		select {
 		// get the client that is getting registered
-		case client := <-wsServer.register:
+		case client := <-wsServer.Register:
 			wsServer.registerClient(client)
 
-		case client := <-wsServer.unRegister:
+		case client := <-wsServer.UnRegister:
 			wsServer.unRegisterClient(client)
 		}
 	}
 }
 
 func (wsServer *WsServer) registerClient(client *models.Client) {
-	wsServer.clients[client] = true
+	wsServer.Clients[client] = true
 }
 
 func (wsServer *WsServer) unRegisterClient(client *models.Client) {
 	// you find this client in map and delete it
-	delete(wsServer.clients, client)
+	delete(wsServer.Clients, client)
 }

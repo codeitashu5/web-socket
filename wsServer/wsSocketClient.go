@@ -34,6 +34,11 @@ const (
 	maxMessageSize = 10000
 )
 
+var (
+	newline = []byte{'\n'}
+	space   = []byte{' '}
+)
+
 // Client each client has a connection associated with it
 type Client struct {
 	Client *models.Client
@@ -52,6 +57,7 @@ func NewClient(wsServer *WsServer, conn *websocket.Conn) *Client {
 // a function that will read messages continuously from the client
 func (c *Client) readPump() {
 
+	// close the connection when the function ends
 	defer func() {
 		err := c.Client.Conn.Close()
 		if err != nil {
@@ -79,10 +85,60 @@ func (c *Client) readPump() {
 
 		// check the given message from the client
 		fmt.Println(string(jsonMessage))
+		c.Client.WsServer.BroadCast <- jsonMessage
 	}
 }
 
-// crating read pump for client
+// it will continuously write messages to the client
+func (c *Client) writePump() {
+	// we create a ticker which will ping the client after the pingTime period is exhausted
+	ticker := time.NewTicker(pingPeriod)
+	defer func() {
+		// after retuning the ticker should stop and the connection is closed
+		ticker.Stop()
+		c.Client.Conn.Close()
+	}()
+
+	// read the message continuously form the
+	for {
+		select {
+		case message, ok := <-c.Client.Send:
+			c.Client.Conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if !ok {
+				// The WsServer closed the channel.
+				c.Client.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
+
+			// creating a new writer for
+			w, err := c.Client.Conn.NextWriter(websocket.TextMessage)
+			if err != nil {
+				return
+			}
+			w.Write(message)
+
+			// gets the total no of pending messages
+			n := len(c.Client.Send)
+			for i := 0; i < n; i++ {
+				w.Write(newline)
+				// keep writing to the client until the send channel is empty
+				w.Write(<-c.Client.Send)
+			}
+
+		// when the time period has elapsed the ticker receives a message
+		case <-ticker.C:
+			/*
+			 so we are saying that we should be able to write our message to
+			 the client within wait time provided that's why we are setting this deadline
+			 every time we write a message
+			*/
+			c.Client.Conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.Client.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
+		}
+	}
+}
 
 func (c *Client) Reader() {
 	for {

@@ -9,4 +9,5 @@ import (
 type Client struct {
 	Conn     *websocket.Conn
 	WsServer *wsServer.WsServer
+	Send     chan []byte // we need to define what kind of channel
 }
